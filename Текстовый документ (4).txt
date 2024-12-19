@@ -1,0 +1,84 @@
+   private void PrintAgreementButton_Click(object sender, RoutedEventArgs e)
+   {
+       string connectionString = @"Server=PVSTUDIOS\SQLEXPRESS;Database=Galaxy;Trusted_Connection=True;";
+       string query = "SELECT TOP 1 ID_Agreement, Бронирование, [Дата заключения], [Список услуг], [Общая стоимость] FROM Agreement ORDER BY [Дата заключения] DESC";
+
+       try
+       {
+           using (SqlConnection connection = new SqlConnection(connectionString))
+           {
+               SqlCommand command = new SqlCommand(query, connection);
+               connection.Open();
+
+               using (SqlDataReader reader = command.ExecuteReader())
+               {
+                   if (reader.Read())
+                   {
+                       // Извлечение данных из результата запроса
+                       int idAgreement = reader.GetInt32(0);
+                       int бронирование = reader.GetInt32(1);
+                       DateTime датаЗаключения = reader.GetDateTime(2);
+
+                       // Измените метод получения в зависимости от типа данных в базе
+                       // Если [Список услуг] - это строка
+                       string списокУслуг = reader.IsDBNull(3) ? string.Empty : reader.GetString(3);
+
+                       // Если [Список услуг] - это int, используйте GetInt32 и преобразуйте его в строку
+                        int списокУслугId = reader.GetInt32(3);
+                        string допУслуг = GetServiceNameById(списокУслугId); // Метод для получения названия услуги по ID
+
+                       decimal общаяСтоимость = reader.GetDecimal(4);
+
+                       // Создание PDF-документа
+                       string pdfPath = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), $"Договор_{idAgreement}.pdf");
+                       using (PdfWriter writer = new PdfWriter(pdfPath))
+                       {
+                           using (PdfDocument pdf = new PdfDocument(writer))
+                           {
+                               Document document = new Document(pdf);
+                               document.Add(new Paragraph("Договор"));
+                               document.Add(new Paragraph($"ID Договора: {idAgreement}"));
+                               document.Add(new Paragraph($"Бронирование: {бронирование}"));
+                               document.Add(new Paragraph($"Дата заключения: {датаЗаключения.ToShortDateString()}"));
+                               document.Add(new Paragraph($"Список услуг: {допУслуг}"));
+                               document.Add(new Paragraph($"Общая стоимость: {общаяСтоимость:C}"));
+                           }
+                       }
+
+                       MessageBox.Show($"Договор успешно создан: {pdfPath}");
+                   }
+                   else
+                   {
+                       MessageBox.Show("Нет записей для печати.");
+                   }
+               }
+           }
+       }
+       catch (Exception ex)
+       {
+           // Обработка ошибок
+           MessageBox.Show($"Произошла ошибка: {ex.Message}");
+       }
+   }
+   private string GetServiceNameById(int serviceId)
+   {
+       string serviceName = string.Empty;
+       string connectionString = @"Server=PVSTUDIOS\SQLEXPRESS;Database=Galaxy;Trusted_Connection=True;";
+       string query = "SELECT Название FROM AdditionalServices WHERE ID_AdditionalService = @ServiceId"; // Предполагается, что у вас есть таблица AdditionalServices
+
+       using (SqlConnection connection = new SqlConnection(connectionString))
+       {
+           SqlCommand command = new SqlCommand(query, connection);
+           command.Parameters.AddWithValue("@ServiceId", serviceId);
+
+           connection.Open();
+
+           object result = command.ExecuteScalar(); // Используем ExecuteScalar для получения одного значения
+           if (result != null)
+           {
+               serviceName = result.ToString(); // Преобразуем результат в строку
+           }
+       }
+
+       return serviceName;
+   }
